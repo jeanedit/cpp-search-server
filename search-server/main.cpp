@@ -64,7 +64,7 @@ public:
 
     void AddDocument(int document_id, const string& document) {
         const vector<string> words = SplitIntoWordsNoStop(document);
-        double one_wrd = 1 / (double)words.size();
+        double one_wrd = 1.0 / words.size();
         for (const string& word : words) {
             word_to_document_freqs_[word][document_id] += one_wrd;
         }
@@ -105,31 +105,62 @@ private:
         return words;
     }
 
+    struct QueryWord {
+        string data;
+        bool is_minus;
+        bool is_stop;
+    };
+
+    QueryWord ParseQueryWord(string text) const {
+        bool is_minus = false;
+        // Word shouldn't be empty
+        if (text[0] == '-') {
+            is_minus = true;
+            text = text.substr(1);
+        }
+        return { text, is_minus, IsStopWord(text) };
+    }
+
+    struct Query {
+        set<string> plus_words;
+        set<string> minus_words;
+    };
+
+
     Query ParseQuery(const string& text) const {
-        Query query_words;
-        for (const string& word : SplitIntoWordsNoStop(text)) {
-            if (word[0] == '-') query_words.minus_w.insert(word.substr(1));
-            else {
-                query_words.plus_w.insert(word);
+        Query query;
+        for (const string& word : SplitIntoWords(text)) {
+            const QueryWord query_word = ParseQueryWord(word);
+            if (!query_word.is_stop) {
+                if (query_word.is_minus) {
+                    query.minus_words.insert(query_word.data);
+                }
+                else {
+                    query.plus_words.insert(query_word.data);
+                }
             }
         }
-        return query_words;
+        return query;
+    }
+
+    double ComputeIDF(const string& word) const {
+        return log(document_count_ * 1.0 / word_to_document_freqs_.at(word).size());
     }
 
     vector<Document> FindAllDocuments(const Query& query_words) const {
         vector<Document> matched_documents;
         map<int, double>document_to_relevance;
 
-        for (const string& word : query_words.plus_w) {
+        for (const string& word : query_words.plus_words) {
             if (word_to_document_freqs_.count(word) == 1) {
-                const auto map_at = word_to_document_freqs_.at(word);
-                double idf = log(document_count_ / (double)map_at.size());
+                const auto& map_at = word_to_document_freqs_.at(word);
+                const double idf = ComputeIDF(word);
                 for (const auto& [id, tf] : map_at) {
                     document_to_relevance[id] += tf * idf;
                 }
             }
         }
-        for (const string& word : query_words.minus_w) {
+        for (const string& word : query_words.minus_words) {
             if (word_to_document_freqs_.count(word) == 1) {
                 for (const auto& [id, tf] : word_to_document_freqs_.at(word)) {
                     document_to_relevance.erase(id);
