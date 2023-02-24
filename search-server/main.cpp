@@ -347,7 +347,7 @@ void TestMatching() {
         vector<string> words = { "cat","walking" };
 
         ASSERT_EQUAL(get<0>(found_docs_2), words);
-        ASSERT_EQUAL(get<1>(found_docs_2), DocumentStatus::ACTUAL);
+        ASSERT_EQUAL(staitc_cast<int>(get<1>(found_docs_2)), static_cast<int>(DocumentStatus::ACTUAL));
         const auto found_docs_3 = server.MatchDocument("cat walking -the -white"s, 42);
         ASSERT(get<0>(found_docs_3).empty());
     }
