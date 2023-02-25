@@ -291,6 +291,30 @@ void RunTestImpl(T& func, const string& expr_str) {
 
 
 
+void TestAddDocument() {
+    const int doc_id = 42;
+    const string content = "cat in the city"s;
+    const vector<int> ratings = { 1, 2, 3 };
+    {
+        SearchServer server;
+        ASSERT(server.GetDocumentCount() == 0);
+    }
+    {
+        SearchServer server;
+        server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
+        ASSERT(server.GetDocumentCount() == 1);
+    }
+
+    {
+        SearchServer server;
+        server.AddDocument(0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, { 8, -3 });
+        server.AddDocument(1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, { 7, 2, 7 });
+        server.AddDocument(2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, { 5, -12, 2, 1 });
+        ASSERT(server.GetDocumentCount() == 3);
+    }
+}
+
+
 // Тест проверяет, что поисковая система исключает стоп-слова при добавлении документов
 void TestExcludeStopWordsFromAddedDocumentContent() {
     const int doc_id = 42;
@@ -402,7 +426,66 @@ void TestRatingCalc() {
 
 }
 
-void TestPredicatAndRelevanceCalc() {
+void TestDocumentStatus() {
+    constexpr double eps = 1e-6;
+    const vector<double> correct_relevances = { 0.866434 ,0.173287,0.231049 };
+    SearchServer search_server;
+    search_server.SetStopWords("и в на"s);
+    search_server.AddDocument(0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, { 8, -3 });
+    search_server.AddDocument(1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, { 7, 2, 7 });
+    search_server.AddDocument(2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, { 5, -12, 2, 1 });
+    search_server.AddDocument(3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, { 9 });
+    search_server.AddDocument(4, "ухоженный кот борис"s, DocumentStatus::IRRELEVANT, { 9,3,1,-10 });
+    search_server.AddDocument(5, "старый кот пушистый воротник"s, DocumentStatus::REMOVED, { 4,-5,1,2,7 });
+
+    // Проверка правильности вывода документов с заданным статусом 
+    const auto found_docs_1 = search_server.FindTopDocuments("пушистый ухоженный кот"s, DocumentStatus::ACTUAL);
+    ASSERT(found_docs_1.size() == 3);
+    ASSERT_EQUAL(found_docs_1[0].id, 1);
+    ASSERT_EQUAL(found_docs_1[1].id, 2);
+    ASSERT_EQUAL(found_docs_1[2].id, 0);
+
+    const auto found_docs_2 = search_server.FindTopDocuments("пушистый ухоженный кот"s, DocumentStatus::BANNED);
+    ASSERT(found_docs_2.size() == 1);
+    ASSERT_EQUAL(found_docs_2[0].id, 3);
+
+    const auto found_docs_3 = search_server.FindTopDocuments("пушистый ухоженный кот"s, DocumentStatus::IRRELEVANT);
+    ASSERT(found_docs_3.size() == 1);
+    ASSERT_EQUAL(found_docs_3[0].id, 4);
+
+    const auto found_docs_4 = search_server.FindTopDocuments("пушистый ухоженный кот"s, DocumentStatus::REMOVED);
+    ASSERT(found_docs_4.size() == 1);
+    ASSERT_EQUAL(found_docs_4[0].id, 5);
+
+}
+
+
+void TestPredicat(){
+    SearchServer search_server;
+    search_server.SetStopWords("и в на"s);
+    search_server.AddDocument(0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, { 8, -3 });
+    search_server.AddDocument(1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, { 7, 2, 7 });
+    search_server.AddDocument(2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, { 5, -12, 2, 1 });
+    search_server.AddDocument(3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, { 9 });
+    search_server.AddDocument(4, "ухоженный кот борис"s, DocumentStatus::IRRELEVANT, { 2,3 });
+
+    const auto found_docs_1 = search_server.FindTopDocuments("пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) { return status == DocumentStatus::IRRELEVANT; });
+    ASSERT_EQUAL(found_docs_1[0].id, 4);
+
+    // Проверка правильности вывода документов с заданным статусом 
+    const auto found_docs_2 = search_server.FindTopDocuments("пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) { return rating % 2 != 0; });
+    ASSERT_EQUAL(found_docs_2[0].id, 1);
+    ASSERT_EQUAL(found_docs_2[1].id, 3);
+    ASSERT_EQUAL(found_docs_2[2].id, 2);
+    
+    // Проверка правильности вывода документов с четным id (тест кастомного предиката)
+    const auto found_docs_3 = search_server.FindTopDocuments("пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) { return document_id % 2 == 0; });
+    ASSERT_EQUAL(found_docs_3[0].id, 4);
+    ASSERT_EQUAL(found_docs_3[1].id, 0);
+    ASSERT_EQUAL(found_docs_3[2].id, 2);
+}
+
+void TestRelevanceCalc() {
     constexpr double eps = 1e-6;
     const vector<double> correct_relevances = { 0.866434 ,0.173287,0.231049 };
     SearchServer search_server;
@@ -424,21 +507,19 @@ void TestPredicatAndRelevanceCalc() {
     const auto found_docs_2 = search_server.FindTopDocuments("пушистый ухоженный кот"s, DocumentStatus::BANNED);
     ASSERT_EQUAL(found_docs_2[0].id, 3);
     ASSERT(abs(found_docs_2[0].relevance - correct_relevances[2]) < eps);
-
-    // Проверка правильности вывода документов с четным id (тест кастомного предиката)
-    const auto found_docs_3 = search_server.FindTopDocuments("пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) { return document_id % 2 == 0; });
-    ASSERT_EQUAL(found_docs_3[0].id, 0);
-    ASSERT_EQUAL(found_docs_3[1].id, 2);
 }
 
 // Функция TestSearchServer является точкой входа для запуска тестов
 void TestSearchServer() {
+    RUN_TEST(TestAddDocument);
     RUN_TEST(TestExcludeStopWordsFromAddedDocumentContent);
     RUN_TEST(TestMinusWordsCheck);
     RUN_TEST(TestMatching);
     RUN_TEST(TestRelevanceSortCheck);
     RUN_TEST(TestRatingCalc);
-    RUN_TEST(TestPredicatAndRelevanceCalc);
+    RUN_TEST(TestDocumentStatus);
+    RUN_TEST(TestPredicat);
+    RUN_TEST(TestRelevanceCalc);
     // Не забудьте вызывать остальные тесты здесь
 }
 
