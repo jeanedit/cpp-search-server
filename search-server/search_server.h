@@ -16,7 +16,7 @@ const int MAX_RESULT_DOCUMENT_COUNT = 5;
 class SearchServer {
 public:
     inline static constexpr int INVALID_DOCUMENT_ID = -1;
-    constexpr double eps = 1e-6;
+    inline static constexpr double eps = 1e-6;
 
     template <typename StringContainer>
     explicit SearchServer(const StringContainer& stop_words)

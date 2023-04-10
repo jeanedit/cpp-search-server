@@ -35,7 +35,7 @@ std::ostream& operator<<(std::ostream& out, const IteratorRange<Iterator>& range
 template <typename Iterator>
 class Paginator {
 public:
-    Paginator(Iterator begin, Iterator end, size_t page_size) {
+    Paginator(Iterator begin, Iterator end, size_t size) {
         int dist = distance(begin, end);
         if (dist <= size) {
             pages_.push_back(IteratorRange<Iterator>(begin, end));
