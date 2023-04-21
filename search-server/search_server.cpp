@@ -16,6 +16,12 @@ void SearchServer::AddDocument(int document_id, const std::string& document, Doc
 	ids_.emplace(document_id);
 }
 
+/* 
+	"нет очистки word_to_documentfreqs"
+	word_to_document_freqs был удален и заменен ids_to_word_freq
+	в задании было сказано про рефакторинг и замену контейнера, мне показалось логичным заменить один контейнер на другой
+	Не слишком ли затратно хранить два похожих по функционалу контейнера?
+*/
 void SearchServer::RemoveDocument(int document_id) {
 	if (ids_to_word_freq_.count(document_id)) {
 		ids_to_word_freq_.erase(document_id);
