@@ -10,9 +10,18 @@ void SearchServer::AddDocument(int document_id, const std::string& document, Doc
 	const double inv_word_count = 1.0 / words.size();
 	for (const std::string& word : words) {
 		query_word = ParseQueryWord(word);
-		word_to_document_freqs_[word][document_id] += inv_word_count;
+		ids_to_word_freq_[document_id][word] += inv_word_count;
 	}
 	documents_.emplace(document_id, DocumentData{ ComputeAverageRating(ratings), status });
+	ids_.emplace(document_id);
+}
+
+void SearchServer::RemoveDocument(int document_id) {
+	if (ids_to_word_freq_.count(document_id)) {
+		ids_to_word_freq_.erase(ids_to_word_freq_.find(document_id));
+		ids_.erase(ids_.find(document_id));
+		documents_.erase(document_id);
+	}
 }
 
 std::vector<Document> SearchServer::FindTopDocuments(const std::string& raw_query, DocumentStatus status) const {
@@ -30,33 +39,28 @@ int SearchServer::GetDocumentCount() const {
 	return documents_.size();
 }
 
+const std::map<std::string, double>& SearchServer::GetWordFrequencies(int document_id) const {
+	if (ids_to_word_freq_.count(document_id)) return ids_to_word_freq_.at(document_id);
+	else return empty_map_;
+}
+
 std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument(const std::string& raw_query,
 	int document_id) const {
 	Query query = ParseQuery(raw_query);
 	std::vector<std::string> matched_words;
 	for (const std::string& word : query.plus_words) {
-		if (word_to_document_freqs_.count(word) == 0) {
-			continue;
-		}
-		if (word_to_document_freqs_.at(word).count(document_id)) {
+		if (ids_to_word_freq_.at(document_id).count(word)) {
 			matched_words.push_back(word);
 		}
 	}
 	for (const std::string& word : query.minus_words) {
-		if (word_to_document_freqs_.count(word) == 0) {
-			continue;
-		}
-		if (word_to_document_freqs_.at(word).count(document_id)) {
+		if (ids_to_word_freq_.at(document_id).count(word)) {
 			matched_words.clear();
 			break;
 		}
 	}
 	std::tuple<std::vector<std::string>, DocumentStatus> match = { matched_words, documents_.at(document_id).status };
 	return match;
-}
-int SearchServer::GetDocumentId(int index) const {
-	if (index < 0 || index >= static_cast<int>(documents_.size())) throw std::out_of_range("document id ouf of range");
-	else return index;
 }
 
 
@@ -118,5 +122,10 @@ SearchServer::Query SearchServer::ParseQuery(const std::string& text) const {
 
 // Existence required
 double SearchServer::ComputeWordInverseDocumentFreq(const std::string& word) const {
-	return log(GetDocumentCount() * 1.0 / word_to_document_freqs_.at(word).size());
+	int count = 0;
+	for (const auto& [_, val] : ids_to_word_freq_) {
+		if (val.count(word)) ++count;
+	}
+
+	return log(GetDocumentCount() * 1.0 / count);
 }
