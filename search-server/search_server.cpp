@@ -20,14 +20,14 @@ void SearchServer::AddDocument(int document_id, const std::string& document, Doc
 
 void SearchServer::RemoveDocument(int document_id) {
 	if (ids_to_word_freq_.count(document_id)) {
+		for (const auto& [word, _] : ids_to_word_freq_[document_id]) {
+			word_to_document_freqs_.at(word).erase(document_id);
+		}
 		ids_to_word_freq_.erase(document_id);
 		ids_.erase(ids_.find(document_id));
 		documents_.erase(document_id);
 	}
-	for (auto& [str, id_freq] : word_to_document_freqs_) {
-		if (id_freq.count(document_id))
-			id_freq.erase(document_id);
-	}
+
 }
 
 
