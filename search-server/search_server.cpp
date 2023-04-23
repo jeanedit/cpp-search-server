@@ -11,24 +11,25 @@ void SearchServer::AddDocument(int document_id, const std::string& document, Doc
 	for (const std::string& word : words) {
 		query_word = ParseQueryWord(word);
 		ids_to_word_freq_[document_id][word] += inv_word_count;
+		word_to_document_freqs_[word][document_id] += inv_word_count;
 	}
 	documents_.emplace(document_id, DocumentData{ ComputeAverageRating(ratings), status });
 	ids_.emplace(document_id);
 }
 
-/* 
-	"нет очистки word_to_documentfreqs"
-	word_to_document_freqs был удален и заменен ids_to_word_freq
-	в задании было сказано про рефакторинг и замену контейнера, мне показалось логичным заменить один контейнер на другой
-	Не слишком ли затратно хранить два похожих по функционалу контейнера?
-*/
+
 void SearchServer::RemoveDocument(int document_id) {
 	if (ids_to_word_freq_.count(document_id)) {
 		ids_to_word_freq_.erase(document_id);
 		ids_.erase(ids_.find(document_id));
 		documents_.erase(document_id);
 	}
+	for (auto& [str, id_freq] : word_to_document_freqs_) {
+		if (id_freq.count(document_id))
+			id_freq.erase(document_id);
+	}
 }
+
 
 std::vector<Document> SearchServer::FindTopDocuments(const std::string& raw_query, DocumentStatus status) const {
 	return FindTopDocuments(
@@ -45,28 +46,34 @@ int SearchServer::GetDocumentCount() const {
 	return documents_.size();
 }
 
-const std::map<std::string, double>& SearchServer::GetWordFrequencies(int document_id) const {
-	if (ids_to_word_freq_.count(document_id)) return ids_to_word_freq_.at(document_id);
-	else return empty_map_;
-}
-
 std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument(const std::string& raw_query,
 	int document_id) const {
 	Query query = ParseQuery(raw_query);
 	std::vector<std::string> matched_words;
 	for (const std::string& word : query.plus_words) {
-		if (ids_to_word_freq_.at(document_id).count(word)) {
+		if (word_to_document_freqs_.count(word) == 0) {
+			continue;
+		}
+		if (word_to_document_freqs_.at(word).count(document_id)) {
 			matched_words.push_back(word);
 		}
 	}
 	for (const std::string& word : query.minus_words) {
-		if (ids_to_word_freq_.at(document_id).count(word)) {
+		if (word_to_document_freqs_.count(word) == 0) {
+			continue;
+		}
+		if (word_to_document_freqs_.at(word).count(document_id)) {
 			matched_words.clear();
 			break;
 		}
 	}
 	std::tuple<std::vector<std::string>, DocumentStatus> match = { matched_words, documents_.at(document_id).status };
 	return match;
+}
+
+const std::map<std::string, double>& SearchServer::GetWordFrequencies(int document_id) const {
+	if (ids_to_word_freq_.count(document_id)) return ids_to_word_freq_.at(document_id);
+	else return empty_map_;
 }
 
 
@@ -128,10 +135,5 @@ SearchServer::Query SearchServer::ParseQuery(const std::string& text) const {
 
 // Existence required
 double SearchServer::ComputeWordInverseDocumentFreq(const std::string& word) const {
-	int count = 0;
-	for (const auto& [_, val] : ids_to_word_freq_) {
-		if (val.count(word)) ++count;
-	}
-
-	return log(GetDocumentCount() * 1.0 / count);
+	return log(GetDocumentCount() * 1.0 / word_to_document_freqs_.at(word).size());
 }

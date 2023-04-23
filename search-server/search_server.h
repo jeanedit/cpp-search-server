@@ -9,8 +9,8 @@
 
 #include "string_processing.h"
 #include "document.h"
-
-using namespace std::literals::string_literals;
+using namespace std; // только так проходят тесты
+//using namespace std::literals::string_literals;
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
 
 class SearchServer {
@@ -48,6 +48,7 @@ public:
     std::tuple<std::vector<std::string>, DocumentStatus> MatchDocument(const std::string& raw_query,
         int document_id) const;
 
+    const std::map<std::string, double>& GetWordFrequencies(int document_id) const;
 
     std::set<int>::const_iterator begin() const {
         return ids_.begin();
@@ -57,21 +58,18 @@ public:
         return ids_.end();
     }
 
-    const std::map<std::string, double>& GetWordFrequencies(int document_id) const;
-
-
 private:
     struct DocumentData {
         int rating;
         DocumentStatus status;
     };
     const std::set<std::string> stop_words_;
-    //std::map<std::string, std::map<int, double>> word_to_document_freqs_;
-
+    std::map<std::string, std::map<int, double>> word_to_document_freqs_;
+    std::map<int, DocumentData> documents_;
     std::map<int, std::map<std::string, double>> ids_to_word_freq_; // Added
     std::map<std::string, double > empty_map_;
-    std::map<int, DocumentData> documents_;
     std::set<int> ids_;
+
     bool IsStopWord(const std::string& word) const;
 
     std::vector<std::string> SplitIntoWordsNoStop(const std::string& text) const;
@@ -111,9 +109,9 @@ std::vector<Document> SearchServer::FindTopDocuments(const std::string& raw_quer
 
     auto result = FindAllDocuments(query, document_predicate);
 
-    std::sort(result.begin(), result.end(),
+    sort(result.begin(), result.end(),
         [](const Document& lhs, const Document& rhs) {
-            if (std::abs(lhs.relevance - rhs.relevance) < eps) {
+            if (abs(lhs.relevance - rhs.relevance) < eps) {
                 return lhs.rating > rhs.rating;
             }
             else {
@@ -131,23 +129,24 @@ std::vector<Document> SearchServer::FindAllDocuments(const Query& query,
     DocumentPredicate document_predicate) const {
     std::map<int, double> document_to_relevance;
     for (const std::string& word : query.plus_words) {
+        if (word_to_document_freqs_.count(word) == 0) {
+            continue;
+        }
         const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
-
-        for (const auto& [document_id, wf] : ids_to_word_freq_) {
-            if (wf.count(word)) {
-                const auto& document_data = documents_.at(document_id);
-                if (document_predicate(document_id, document_data.status, document_data.rating)) {
-                    document_to_relevance[document_id] += wf.at(word) * inverse_document_freq;
-                }
+        for (const auto [document_id, term_freq] : word_to_document_freqs_.at(word)) {
+            const auto& document_data = documents_.at(document_id);
+            if (document_predicate(document_id, document_data.status, document_data.rating)) {
+                document_to_relevance[document_id] += term_freq * inverse_document_freq;
             }
         }
     }
 
     for (const std::string& word : query.minus_words) {
-        for (const auto& [document_id, wf] : ids_to_word_freq_) {
-            if (wf.count(word)) {
-                document_to_relevance.erase(document_id);
-            }
+        if (word_to_document_freqs_.count(word) == 0) {
+            continue;
+        }
+        for (const auto [document_id, _] : word_to_document_freqs_.at(word)) {
+            document_to_relevance.erase(document_id);
         }
     }
 
@@ -158,4 +157,3 @@ std::vector<Document> SearchServer::FindAllDocuments(const Query& query,
     }
     return matched_documents;
 }
-
