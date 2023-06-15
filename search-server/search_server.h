@@ -312,15 +312,14 @@ std::tuple<std::vector<std::string_view>, DocumentStatus> SearchServer::MatchDoc
         return MatchDocument(raw_query, document_id);
     }
     if (!ids_.count(document_id)) {
-        throw std::out_of_range("Id of document out of range");
+        throw std::out_of_range("Document ID out of range");
     }
     auto query = ParseQuery(true, raw_query);
 
     std::sort(query.minus_words.begin(), query.minus_words.end());
     query.minus_words.erase(std::unique(query.minus_words.begin(), query.minus_words.end()), query.minus_words.end());
 
-    std::sort(query.plus_words.begin(), query.plus_words.end());
-    query.plus_words.erase(std::unique(query.plus_words.begin(), query.plus_words.end()), query.plus_words.end());
+
 
     if (std::any_of(query.minus_words.begin(), query.minus_words.end(), [this, document_id](std::string_view word) {
         return ids_to_word_freq_.at(document_id).count(word);
@@ -328,7 +327,9 @@ std::tuple<std::vector<std::string_view>, DocumentStatus> SearchServer::MatchDoc
         return { {}, documents_.at(document_id).status };
     }
 
-
+    std::sort(query.plus_words.begin(), query.plus_words.end());
+    query.plus_words.erase(std::unique(query.plus_words.begin(), query.plus_words.end()), query.plus_words.end());
+    
     std::vector<std::string_view> matched_words(query.plus_words.size());
 
 
