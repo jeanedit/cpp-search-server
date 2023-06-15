@@ -268,7 +268,7 @@ std::vector<Document> SearchServer::FindAllDocuments(ExecutionPolicy&& policy,co
         });
 
 
-    std::for_each(policy, query.minus_words.begin(), query.minus_words.end(), [this, &document_predicate, &document_to_relevance](const std::string_view word) {
+    std::for_each(policy, query.minus_words.begin(), query.minus_words.end(), [this,&document_to_relevance](const std::string_view word) {
         if (word_to_document_freqs_.count(word) != 0) {
             for (const auto [document_id, _] : word_to_document_freqs_.at(word)) {
                 document_to_relevance.Erase(document_id);
