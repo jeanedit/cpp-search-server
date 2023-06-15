@@ -1,5 +1,6 @@
 #include "test_example_functions.h"
 #include "search_server.h"
+
 using namespace std;
 
 void AssertImpl(bool value, const string& expr_str, const string& file, const string& func, unsigned line,
@@ -72,7 +73,7 @@ void TestMatching() {
 
 		ASSERT(get<0>(found_docs_1).empty());
 		const auto found_docs_2 = server.MatchDocument("cat walking -the"s, 42);
-		vector<string> words = { "cat","walking" };
+		vector<string_view> words = { "cat","walking" };
 
 		ASSERT_EQUAL(get<0>(found_docs_2), words);
 		ASSERT_EQUAL(static_cast<int>(get<1>(found_docs_2)), static_cast<int>(DocumentStatus::ACTUAL));
