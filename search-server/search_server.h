@@ -78,7 +78,7 @@ public:
     matched_words_status MatchDocument(std::string_view raw_query,
         int document_id) const;
 
-    matched_words_status MatchDocument(std::execution::sequenced_policy policy, std::string_view raw_query,
+    matched_words_status MatchDocument(std::execution::sequenced_policy, std::string_view raw_query,
         int document_id) const;
 
     matched_words_status MatchDocument(std::execution::parallel_policy, std::string_view raw_query,
