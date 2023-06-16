@@ -243,7 +243,11 @@ std::vector<Document> SearchServer::FindAllDocuments(std::execution::parallel_po
         });
 
 
+<<<<<<< HEAD
     std::for_each(std::execution::par, query.minus_words.begin(), query.minus_words.end(), [this, &document_to_relevance](const std::string_view word) {
+=======
+    std::for_each(policy, query.minus_words.begin(), query.minus_words.end(), [this,&document_to_relevance](const std::string_view word) {
+>>>>>>> 6d45938cc226b37f5cc056899734b55a21ffd680
         if (word_to_document_freqs_.count(word) != 0) {
             for (const auto [document_id, _] : word_to_document_freqs_.at(word)) {
                 document_to_relevance.Erase(document_id);
@@ -278,3 +282,41 @@ void SearchServer::RemoveDocument(ExecutionPolicy&& policy, int document_id) {
     }
 }
 
+<<<<<<< HEAD
+=======
+
+
+template<typename ExecutionPolicy>
+std::tuple<std::vector<std::string_view>, DocumentStatus> SearchServer::MatchDocument(ExecutionPolicy&& policy, std::string_view raw_query, int document_id) const {
+    if constexpr (std::is_same_v<std::remove_reference_t<ExecutionPolicy&&>, const std::execution::sequenced_policy>) {
+        return MatchDocument(raw_query, document_id);
+    }
+    if (!ids_.count(document_id)) {
+        throw std::out_of_range("Document ID out of range");
+    }
+    auto query = ParseQuery(true, raw_query);
+
+    std::sort(query.minus_words.begin(), query.minus_words.end());
+    query.minus_words.erase(std::unique(query.minus_words.begin(), query.minus_words.end()), query.minus_words.end());
+
+
+
+    if (std::any_of(query.minus_words.begin(), query.minus_words.end(), [this, document_id](std::string_view word) {
+        return ids_to_word_freq_.at(document_id).count(word);
+        })) {
+        return { {}, documents_.at(document_id).status };
+    }
+
+    std::sort(query.plus_words.begin(), query.plus_words.end());
+    query.plus_words.erase(std::unique(query.plus_words.begin(), query.plus_words.end()), query.plus_words.end());
+    
+    std::vector<std::string_view> matched_words(query.plus_words.size());
+
+
+    auto it_for_resize = std::copy_if(query.plus_words.begin(), query.plus_words.end(), matched_words.begin(), [this, document_id](std::string_view word) {
+        return ids_to_word_freq_.at(document_id).count(word);
+        });
+    matched_words.resize(std::distance(matched_words.begin(), it_for_resize));
+    return { matched_words, documents_.at(document_id).status };
+}
+>>>>>>> 6d45938cc226b37f5cc056899734b55a21ffd680
