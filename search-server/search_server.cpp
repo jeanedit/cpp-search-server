@@ -8,7 +8,10 @@ void SearchServer::AddDocument(int document_id, std::string_view document, Docum
 	const std::vector<int>& ratings) {
 	const std::vector<std::string_view> words = SplitIntoWordsNoStop(document);
 	QueryWord query_word;
-	if (documents_.count(document_id) != 0 || document_id < 0) throw std::invalid_argument("inappropriate id");
+	if (documents_.count(document_id) != 0 || document_id < 0) {
+		throw std::invalid_argument("inappropriate id");
+	}
+
 	const double inv_word_count = 1.0 / words.size();
 
 	for (const std::string_view word :words) {
@@ -37,14 +40,14 @@ void SearchServer::RemoveDocument(int document_id) {
 
 
 std::vector<Document> SearchServer::FindTopDocuments(std::string_view raw_query, DocumentStatus status) const {
-	return FindTopDocuments(
+	return FindTopDocuments(std::execution::seq,
 		raw_query, [status](int document_id, DocumentStatus document_status, int rating) {
 			return document_status == status;
 		});
 }
 
 std::vector<Document> SearchServer::FindTopDocuments(std::string_view raw_query) const {
-	return FindTopDocuments(raw_query, DocumentStatus::ACTUAL);
+	return FindTopDocuments(std::execution::seq,raw_query, DocumentStatus::ACTUAL);
 }
 
 int SearchServer::GetDocumentCount() const {
@@ -52,6 +55,11 @@ int SearchServer::GetDocumentCount() const {
 }
 
 std::tuple<std::vector<std::string_view>, DocumentStatus> SearchServer::MatchDocument(std::string_view raw_query,
+	int document_id) const {
+	return MatchDocument(std::execution::seq,raw_query,document_id);
+}
+
+SearchServer::matched_words_status SearchServer::MatchDocument(std::execution::sequenced_policy ,std::string_view raw_query,
 	int document_id) const {
 	Query query = ParseQuery(false,raw_query);
 	std::vector<std::string_view> matched_words;
@@ -71,6 +79,35 @@ std::tuple<std::vector<std::string_view>, DocumentStatus> SearchServer::MatchDoc
 			matched_words.push_back(word);
 		}
 	}
+	return { matched_words, documents_.at(document_id).status };
+}
+
+SearchServer::matched_words_status SearchServer::MatchDocument(std::execution::parallel_policy, std::string_view raw_query, int document_id) const {
+	if (!ids_.count(document_id)) {
+		throw std::out_of_range("Document ID out of range");
+	}
+	auto query = ParseQuery(true, raw_query);
+
+	std::sort(query.minus_words.begin(), query.minus_words.end());
+	query.minus_words.erase(std::unique(query.minus_words.begin(), query.minus_words.end()), query.minus_words.end());
+
+
+	if (std::any_of(query.minus_words.begin(), query.minus_words.end(), [this, document_id](std::string_view word) {
+		return ids_to_word_freq_.at(document_id).count(word);
+		})) {
+		return { {}, documents_.at(document_id).status };
+	}
+
+	std::sort(query.plus_words.begin(), query.plus_words.end());
+	query.plus_words.erase(std::unique(query.plus_words.begin(), query.plus_words.end()), query.plus_words.end());
+
+	std::vector<std::string_view> matched_words(query.plus_words.size());
+
+
+	auto it_for_resize = std::copy_if(query.plus_words.begin(), query.plus_words.end(), matched_words.begin(), [this, document_id](std::string_view word) {
+		return ids_to_word_freq_.at(document_id).count(word);
+		});
+	matched_words.resize(std::distance(matched_words.begin(), it_for_resize));
 	return { matched_words, documents_.at(document_id).status };
 }
 

@@ -69,5 +69,5 @@ int main() {
     }
     const auto queries = GenerateQueries(generator, dictionary, 100, 70);
     TEST(seq);
-    TEST(par);
+   TEST(par);
 }
