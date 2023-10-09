@@ -1,15 +1,18 @@
 # Search Server
-Реализация поискового сервера каталога документов. По поисковому запросу подбирает документ с наилучшей релевантностью. Релевантность рассчитывается на основе статистической меры TF-IDF. Сервер учитывает стоп-слова и минус слова при поиске документов, обрабатывает дупликаты и использует несколько потоков для обработки запросов. На выходе пользователь получает 5 наиболее подходящих документов.
-# Использование
-0. Установка всех необходимых компонентов.
-1. Инициализация поискового сервера происходит с использованием стоп-слов.
-2. Добавление документов в сервер.
-3. Формирование очереди запросов.
-4. Вывод результатов.
-5. Тесты помогут более подробно разобраться с возможностями данного поискового сервера.
-# Cистемные требования
+Implementation of a document catalog search server. Given a search query, it retrieves the most relevant document based on the statistical TF-IDF measure. The server takes into account stop words and negative keywords when searching for documents, handles duplicates, and utilizes multiple threads to process queries. The user receives the top 5 most relevant documents as output.
+
+# Usage
+0. Install all necessary components.
+1. Initialize the search server using stop words.
+2. Add documents to the server.
+3. Formulate the query queue.
+4. Output the results.
+5. Tests will help you explore the capabilities of this search server in more detail.
+
+# System Requirements
 1. C++17
-2. Любой из следующих компиляторов: GCC,MSVC,CLANG.
-# Планы по доработке:
-1. Возможность добавления документов с помощью файла.
-2. Графический интерфейс для удобной работы с сервером.
+2. Any of the following compilers: GCC, MSVC, CLANG.
+
+# Future Enhancements
+1. Ability to add documents using a file.
+2. A graphical user interface for convenient interaction with the server.
